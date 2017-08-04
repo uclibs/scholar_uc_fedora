@@ -1,22 +1,9 @@
 #!/bin/sh
 
-FCREPO_DATA_DIR="/opt/fedora/data"
-FCREPO_CONFIG_DIR="/opt/fedora/etc"
-FCREPO_TMP_DIR="/opt/fedora/tmp"
-TOMCAT_DIR="/opt/apache-tomcat-8.5.16"
-JRE_HOME_DIR="/usr/lib/jvm/java-1.8.0-openjdk-1.8.0.121-0.b13.el7_3.x86_64/jre"
+my_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+source $my_dir/fcrepo_variables.sh
 
-export CATALINA_BASE="$TOMCAT_DIR"; 
-
-export CATALINA_HOME="$TOMCAT_DIR"; 
-
-export CATALINA_TMPDIR="$FCREPO_TMP_DIR"; 
-
-export CLASSPATH="$TOMCAT_DIR/bin/bootstrap.jar:$TOMCAT_DIR/bin/tomcat-juli.jar"
-
-export JRE_HOME="$JRE_HOME_DIR"
-
-export JAVA_OPTS="
+OPTS="
   -Dfile.encoding=UTF-8 \
   -Djava.awt.headless=true \
   -Dlogback.configurationFile=$FCREPO_CONFIG_DIR/logback.xml \
@@ -30,18 +17,52 @@ export JAVA_OPTS="
   -Dcom.arjuna.ats.arjuna.objectstore.objectStoreDir=arjuna.object.store \
   -Dnet.sf.ehcache.skipUpdateCheck=true \
   -Djava.io.tmpdir=$FCREPO_TMP_DIR \
-  
-  -XX:+UseConcMarkSweepGC \
-  -XX:+CMSClassUnloadingEnabled \
+  -server \
+"
+
+GC_CONFIG="  
   -XX:+DisableExplicitGC \
   -XX:ConcGCThreads=5 \
   -XX:MaxGCPauseMillis=200 \
   -XX:ParallelGCThreads=20 \
-  
-  -XX:MaxMetaspaceSize=512m \
-  -Xms1024m \
-  -Xmx1024m \
-
-  -server
 "
+
+GC_CONFIG_LARGE_HEAP="
+  -XX:+UseG1GC \
+"
+
+GC_CONFIG_SMALL_HEAP="
+  -XX:+UseConcMarkSweepGC \
+  -XX:+CMSClassUnloadingEnabled \
+"
+
+MEMORY_CONFIG="  
+  -XX:MaxMetaspaceSize=512m \
+  -Xms${MIN_HEAP}m \
+  -Xmx${MAX_HEAP}m \
+"
+
+MYSQL_CONFIG="
+  -Dfcrepo.mysql.username=$MYSQL_USER \
+  -Dfcrepo.mysql.password=$MYSQL_PASS \
+  -Dfcrepo.mysql.host=$MYSQL_HOST \
+  -Dfcrepo.mysql.port=$MYSQL_PORT \
+"
+
+if [ ${MIN_HEAP} -gt 4096 ]
+  then
+    export JAVA_OPTS="$OPTS $MYSQL_CONFIG $GC_CONFIG $GC_CONFIG_LARGE_HEAP $MEMORY_CONFIG"
+  else
+    export JAVA_OPTS="$OPTS $MYSQL_CONFIG $GC_CONFIG $GC_CONFIG_SMALL_HEAP $MEMORY_CONFIG"
+fi
+
+export CATALINA_BASE="$TOMCAT_DIR"; 
+
+export CATALINA_HOME="$TOMCAT_DIR"; 
+
+export CATALINA_TMPDIR="$FCREPO_TMP_DIR"; 
+
+export CLASSPATH="$TOMCAT_DIR/bin/bootstrap.jar:$TOMCAT_DIR/bin/tomcat-juli.jar"
+
+export JRE_HOME="$JRE_HOME_DIR"
 
